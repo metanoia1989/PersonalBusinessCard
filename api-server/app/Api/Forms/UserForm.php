@@ -39,7 +39,7 @@ class UserForm extends Validator
         return [
             'username'  => [ 'string', 'maxLength' => 25, 'filter' => ['trim'] ],
             'mobile'   => [ 'integer', 'unsigned' => true, 'length' => 11, 'filter' => ['trim'] ],
-            'password' => [ 'minLength' => 6, 'maxLength' => 30 ],
+            'password' => [ 'string', 'minLength' => 6, 'maxLength' => 30 ],  
         ];
     }
 

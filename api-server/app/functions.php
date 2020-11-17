@@ -20,12 +20,12 @@ function config()
  * json 输出格式化函数
  *
  * @param \Mix\Http\Message\Response $response
- * @param string $code
- * @param string $msg
  * @param array $data
+ * @param string $code
+ * @param int $msg
  * @return Response
  */
-function json_response(Response $response, $data = [], string $msg = 'OK', string $code = 0)
+function json_response(Response $response, $data = null, string $msg = 'OK', int $code = 0)
 {
     $content = ['status' => $code, 'msg' => $msg, 'data' => $data];
     return ResponseHelper::json($response, $content);      

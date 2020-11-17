@@ -31,11 +31,21 @@ class UserController
             return json_response($response, null, $form->getErrors(), 1);
         }
 
-        // 执行保存数据库
-        (new UserModel())->add($request->getAttributes());
+        $userModel = new UserModel();
+         
+        $user = $userModel->whereFirst([['username', '=', $form->username]]);
+        if ($user) {
+            return json_response($response, null, '创建失败：已存在此用户', -1);
+        }
 
-        // 响应
-        return json_response($response, null, 'OK');
+        // 执行保存数据库
+        $data = $request->getAttributes();
+        $data["password"] = md5($data["password"]);
+        if ($userModel->add($data)) {
+            return json_response($response, null, 'OK');
+        } else {
+            return json_response($response, null, '创建失败，未知', -1);
+        }
     }
 
     /**

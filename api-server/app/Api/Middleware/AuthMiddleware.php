@@ -62,11 +62,11 @@ class AuthMiddleware implements MiddlewareInterface
             $payload = $this->auth->getPayload($tokenExtractor);
         } catch (\Throwable $e) {
             // 中断执行，返回错误信息
-            $content  = ['code' => 100001, 'message' => 'No access'];
+            $content  = ['code' => 100001, 'message' => 'No auth access'];
             $response = ResponseHelper::json($this->response, $content);
             return $response;
         }
-
+        
         // 把 JWT Payload 放入 Request 的上下文，方便其他位置调用
         $context = $this->request->getContext();
         $context->withValue('payload', $payload);

@@ -1,18 +1,25 @@
 <?php
 
 return function (Mix\FastRoute\RouteCollector $collector) {
-    $collector->post('/file/upload',
-        [\App\Api\Controllers\FileController::class, 'upload'],
-        [\App\Api\Middleware\ActionMiddleware::class]
-    );
+    $auth_middleware = [
+        \App\Api\Middleware\ActionMiddleware::class,
+        \App\Api\Middleware\AuthMiddleware::class,
+        \App\Api\Middleware\CorsMiddleware::class
+    ];
+    $common_middleware = [
+        \App\Api\Middleware\ActionMiddleware::class,
+        \App\Api\Middleware\CorsMiddleware::class
+    ];
 
-    $collector->group('/v2',
-        function (Mix\FastRoute\RouteCollector $collector) {
-            $collector->post('/user/create',
-                [\App\Api\Controllers\UserController::class, 'create'],
-                [\App\Api\Middleware\ActionMiddleware::class]
-            );
-        },
-        [\App\Api\Middleware\GroupMiddleware::class]
-    );
+    $collector->post('/file/upload', [\App\Api\Controllers\FileController::class, 'upload'], $auth_middleware);
+
+    /** 后台相关 */
+    $collector->post('/auth/user/logout', [\App\Api\Controllers\AuthController::class, 'logout'], $auth_middleware); // 用户注销
+    $collector->get('/auth/user/info', [\App\Api\Controllers\AuthController::class, 'info'], $auth_middleware); // 用户个人信息
+    $collector->post('/card/profile/update', [\App\Api\Controllers\CardController::class, 'update'], $auth_middleware); // 更新名片信息
+    $collector->post('/auth/user/login', [\App\Api\Controllers\AuthController::class, 'login'], $common_middleware); // 用户登录
+    $collector->post('/user/create', [\App\Api\Controllers\UserController::class, 'create'], $common_middleware);
+
+    /** 小程序相关 */
+    $collector->get('/card/profile/details', [\App\Api\Controllers\CardController::class, 'details'], $common_middleware); // 小程序获取信息
 };

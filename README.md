@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS `yang_user` (
     `password` VARCHAR(255) NOT NULL COMMENT '密码',
     `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` timestamp NULL DEFAULT NULL COMMENT '更新时间',
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE INDEX `username`(`username`)
 )
 COLLATE='utf8mb4_unicode_ci'
 ENGINE=InnoDB
