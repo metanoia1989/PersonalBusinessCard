@@ -53,5 +53,19 @@ class AuthController
     }
 
     
+    /**
+     * 获取用户个人信息
+     *
+     * @param ServerRequest $request
+     * @param Response $response
+     * @return Response
+     */
+    public function me(ServerRequest $request, Response $response)
+    {
+        $payload = $request->getContext()->getValue('payload');
+        return json_response($response, $payload, 'OK');  
+        // $uid = $payload["uid"];
+        // $user = (new UserModel())->get($uid);
+    }
 
 }
