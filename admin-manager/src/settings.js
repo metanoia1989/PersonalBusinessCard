@@ -12,5 +12,11 @@ module.exports = {
    * @type {boolean} true | false
    * @description Whether show the logo in sidebar
    */
-  sidebarLogo: false
+  sidebarLogo: true,
+
+  /**
+   * @type {string}
+   * @description 站点地址
+   */
+  upload_url:  '/file/uploadPublic',
 }

@@ -27,7 +27,7 @@ class AuthController
         $form = new UserForm($request->getAttributes());
         $form->setScenario('login');
         if (!$form->validate()) {
-            return json_response($response, null, $form->getErrors(), 1);
+            return json_response($response, $form->getErrors(), "参数验证失败", 1);
         }
 
         $user = (new UserModel())->whereFirst([
@@ -49,9 +49,9 @@ class AuthController
         ];
         $accessToken = $auth->createToken($payload);
 
-        return json_response($response, $accessToken, 'OK');
+        $data = [ "token" => $accessToken ];
+        return json_response($response, $data, 'OK');
     }
-
     
     /**
      * 获取用户个人信息
@@ -62,10 +62,25 @@ class AuthController
      */
     public function me(ServerRequest $request, Response $response)
     {
-        $payload = $request->getContext()->getValue('payload');
-        return json_response($response, $payload, 'OK');  
-        // $uid = $payload["uid"];
-        // $user = (new UserModel())->get($uid);
+        $payload = $request->getContext()->value('payload');
+        $uid = $payload["uid"];
+        $user = (new UserModel())->get($uid);
+        if (isset($user['avatar']) && !empty($user['avatar'])) {
+            $user['avatar'] = getenv("APP_URL").$user['avatar'];        
+        }
+        return json_response($response, $user, 'OK');
+    }
+
+    /**
+     * 注销登录
+     *
+     * @param ServerRequest $request
+     * @param Response $response
+     * @return Response
+     */
+    public function logout(ServerRequest $request, Response $response)
+    {
+        return json_response($response, null, 'OK');
     }
 
 }

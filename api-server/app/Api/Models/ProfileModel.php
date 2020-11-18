@@ -6,7 +6,7 @@ namespace App\Api\Models;
  * Class UserModel
  * @package App\Api\Models
  */
-class UserModel extends BaseModel
+class ProfileModel extends BaseModel
 {
     /**
      * @var string

@@ -62,7 +62,7 @@ class AuthMiddleware implements MiddlewareInterface
             $payload = $this->auth->getPayload($tokenExtractor);
         } catch (\Throwable $e) {
             // 中断执行，返回错误信息
-            $content  = ['code' => 100001, 'message' => 'No auth access'];
+            $content  = ['code' => 50008, 'message' => 'No auth access'];
             $response = ResponseHelper::json($this->response, $content);
             return $response;
         }

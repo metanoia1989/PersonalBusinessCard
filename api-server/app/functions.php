@@ -27,6 +27,6 @@ function config()
  */
 function json_response(Response $response, $data = null, string $msg = 'OK', int $code = 0)
 {
-    $content = ['status' => $code, 'msg' => $msg, 'data' => $data];
+    $content = ['code' => $code, 'message' => $msg, 'data' => $data];
     return ResponseHelper::json($response, $content);      
-}
+}   

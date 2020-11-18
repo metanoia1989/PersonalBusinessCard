@@ -2,9 +2,7 @@
 
 namespace App\Api\Controllers;
 
-use App\Common\Helpers\ResponseHelper;
-use App\Api\Forms\UserForm;
-use App\Api\Models\UserModel;
+use App\Api\Models\ProfileModel;
 use Mix\Http\Message\Response;
 use Mix\Http\Message\ServerRequest;
 
@@ -24,7 +22,32 @@ class CardController
      */
     public function details(ServerRequest $request, Response $response)
     {
-        return json_response($response, null, 'OK');
+        try {
+            $payload = $request->getContext()->value('payload');
+            $uid = $payload["uid"];
+        } catch (\InvalidArgumentException $th) {
+            $uid = 1;
+        }
+
+        $list = (new ProfileModel)->whereGet([['user_id', '=', $uid]]);
+
+        $desc = $request->getAttribute('desc', 0); // 是否要对描述按换行符分割
+
+        // 处理信息中特别的记录 
+        $list = array_map(function ($item) use ($desc) {
+            if ($desc && $item["key"] == "description") {
+                $value = explode("\n", $item["value"]);
+                $item["value"] = array_filter($value);
+            }
+            if ($item["key"] == "tags") {
+                $item["value"] = explode(",", $item["value"]);
+            }
+            return $item;
+        }, $list);
+        
+        $data = array_column($list, 'value', 'key');
+
+        return json_response($response, $data, 'OK');
     }
     
 
@@ -36,6 +59,24 @@ class CardController
      */
     public function update(ServerRequest $request, Response $response)
     {
-        return json_response($response, null, 'OK');
+
+        try {
+            $params = $request->getAttributes();
+
+            $payload = $request->getContext()->value('payload');
+            $uid = $payload["uid"];
+            $profileModel = new ProfileModel();
+
+            foreach ($params as $key => $value) {
+                if ($key == "tags" && $value) {
+                    $value = implode(",", $value); 
+                } 
+                $profileModel->update([['user_id', '=', $uid], ['`key`', '=', $key]], ['value' => $value]);
+            }
+
+            return json_response($response, null, 'OK');
+        } catch (\Throwable $th) {
+            return json_response($response, null, $th->getMessage(), -1);
+        }
     }
 }

@@ -46,11 +46,16 @@ class BaseModel
      * 获取指定ID的数据
      *
      * @param integer $id
+     * @param string $select
      * @return array
      */
-    public function get(int $id)
+    public function get(int $id, string $select = '*')
     {
-        return $this->db->table($this->table)->where(['id', '=', $id])->first();
+        return $this->db
+            ->table($this->table)
+            ->where(['id', '=', $id])
+            ->select($select)
+            ->first();
     }
 
     public function whereFirst(array $where, $orderBy = null, $select = '*')

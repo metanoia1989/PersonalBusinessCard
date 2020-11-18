@@ -28,7 +28,7 @@ class UserController
         $form = new UserForm($request->getAttributes());
         $form->setScenario('create');
         if (!$form->validate()) {
-            return json_response($response, null, $form->getErrors(), 1);
+            return json_response($response, $form->getErrors(), "参数验证失败", 1);
         }
 
         $userModel = new UserModel();
@@ -61,7 +61,7 @@ class UserController
         $form = new UserForm($request->getAttributes());
         $form->setScenario('update');
         if (!$form->validate()) {
-            return json_response($response, null, $form->getErrors(), 1);
+            return json_response($response, $form->getErrors(), "参数验证失败", 1);
         }
 
         // 执行保存数据库
@@ -70,33 +70,5 @@ class UserController
         // 响应
         return json_response($response, null, 'OK');
     }
-
-    /**
-     * 用户登录
-     *
-     * @param ServerRequest $request
-     * @param Response $response
-     * @return Response
-     */
-    public function login(ServerRequest $request, Response $response)
-    {
-        // 使用表单验证器
-        $form = new UserForm($request->getAttributes());
-        $form->setScenario('login');
-        if (!$form->validate()) {
-            return json_response($response, null, $form->getErrors(), 1);
-        }
-
-        // 执行保存数据库
-        (new UserModel())->whereFirst([
-            ['username', '=', $form->username], 
-            ['p']
-        ]);
-
-        // 响应
-        return json_response($response, null, 'OK');
-    }
-
-    
 
 }

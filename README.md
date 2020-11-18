@@ -65,9 +65,25 @@ CREATE TABLE IF NOT EXISTS `yang_profile` (
     `value`  TEXT COMMENT '内容',
     PRIMARY KEY (`id`),
     INDEX `user_id` (`user_id`),
-    UNIQUE INDEX `unique_info` (`user_id`, `type`, `key`) 
+    UNIQUE INDEX `unique_info` (`user_id`, `key`) 
 )
 COLLATE='utf8mb4_unicode_ci'
 ENGINE=InnoDB
 COMMENT='个人信息表';
+```
+
+个人名片的初始化内容
+```sql
+INSERT INTO `yang_profile` (`user_id`, `type`, `key`, `name`, `value`) VALUES
+(1, '个人信息', 'avatar', '头像', ''),
+(1, '个人信息', 'name', '姓名', '杨茂珍'),
+(1, '个人信息', 'position', '职位', '招生老师'),
+(1, '个人信息', 'tags', '个人标签', '消防培训,消防咨询,消防信息,消防设施操作员'),
+(1, '个人信息', 'description', '个人描述', '广东省安卓消防职业培训学院，主要提供初级、中级消防设施操作员、一级注册消防工程师。\n安卓消防学院 坚持“办学高起步、管理高标准、服务高水平、培训高质量”理念，提供专业的消防考证培训，线上课程加线下培训，全省20个地区均设有培训点，方便高效。\n百度搜索“安卓消防培训学院” “安卓消防”了解更多…..'),
+(1, '联系方式', 'phone', '手机号', '15013245515'),
+(1, '联系方式', 'email', '邮箱', '2219035987@qq.com'),
+(1, '联系方式', 'company', '公司', '广东省安卓消防职业培训学院'),
+(1, '联系方式', 'website', '网址', 'http://www.anzhuoxfpx.com'),
+(1, '联系方式', 'address', '地址', '广州市天河区高科路37号国家大学科技园B栋1-2楼（总部）')
+(1, '主题样式', 'theme_color', '主题颜色', '#36538f');
 ```
