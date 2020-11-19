@@ -4,7 +4,7 @@ if (process.env.NODE_ENV === 'development') {
     app_url = 'http://azxfcard.test';
 } else {
     // 生产环境
-    app_url = 'https://yang.anzhuoxfpx.com';
+    app_url = 'https://yang.anzhuoxfpx.com/api';
 }
 
 class request {

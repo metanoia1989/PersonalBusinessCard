@@ -373,13 +373,16 @@
 			 */
 			openLocation() {
 				uni.openLocation({
-					latitude: this.profile.latitude,
-					longitude: this.profile.longitude,
+					latitude: parseFloat(this.profile.latitude),
+					longitude: parseFloat(this.profile.longitude),
 					name: this.profile.company,
 					address: this.profile.address,
 					success: function() {
 						console.log('success');
-					}
+					},
+                    fail: (error) => {
+                        console.log(error);
+                    }
 				});
 			},
 			/**
