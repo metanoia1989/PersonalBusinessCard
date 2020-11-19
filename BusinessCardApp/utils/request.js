@@ -1,10 +1,10 @@
-
+var app_url;
 if (process.env.NODE_ENV === 'development') {
     // 开发环境
-    const app_url = 'http://azxfcard.test';
+    app_url = 'http://azxfcard.test';
 } else {
     // 生产环境
-    const app_url = 'http://card.anzhuoxfpx.com';
+    app_url = 'https://yang.anzhuoxfpx.com';
 }
 
 class request {
@@ -60,9 +60,11 @@ class request {
           header: header,
           method: method,
           success: (res => {
-            if (res.is_success == 'success') {
+            const { data } = res;
+            console.log(data);
+            if (data.code == 0) {
               //200: 服务端业务处理正常结束
-              resolve(res)
+              resolve(data.data)
             } else {
               uni.showModal({
                 title: '提示',
@@ -72,7 +74,10 @@ class request {
             }
           }),
           fail: (res => {
-            console.log('身份验证失败，请重新登陆')
+            console.log(res)
+            uni.showToast({
+                title: "服务器繁忙！"
+            });
           })
         })
       })

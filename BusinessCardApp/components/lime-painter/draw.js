@@ -1,17 +1,17 @@
-import { toPx, CHAR_WIDTH_SCALE_MAP, base64ToPath  } from './utils'
+import { toPx, CHAR_WIDTH_SCALE_MAP, base64ToPath, pathToBase64, isNumber  } from './utils'
 import { GD } from './gradient'
 let id = 0
 let cache = {}
 export class Draw {
-	constructor(context, canvas, use2dCanvas = false) {
+	constructor(context, canvas, use2dCanvas = false, isH5PathToBase64 = false) {
 		this.ctx = context
 		this.canvas = canvas || null
 		this.use2dCanvas = use2dCanvas
+		this.isH5PathToBase64 = isH5PathToBase64
 	}
-	
 	roundRect(x, y, w, h, r, fill = false, stroke = false, ) {
 		if (r < 0) return
-		const ctx = this.ctx
+		const {ctx} = this
 		ctx.beginPath()
 		if(!r) {
 			ctx.rect(x, y, w, h)
@@ -44,7 +44,7 @@ export class Draw {
 		if (fill) ctx.fill()
 	}
 	measureText(text, fontSize) {
-		const ctx = this.ctx
+		const { ctx } = this
 		// #ifndef APP-PLUS
 		return ctx.measureText(text).width
 		// #endif
@@ -57,23 +57,55 @@ export class Draw {
 		  }, 0) * fontSize;
 		// #endif
 	}
-	setFont({fontFamily = 'sans-serif', fontSize = 14, fontWeight = 'normal' , textStyle = 'normal'}) {
+	setFont({fontFamily: ff = 'sans-serif', fontSize: fs = 14, fontWeight: fw = 'normal' , textStyle: ts = 'normal'}) {
 		let ctx = this.ctx
 		// 设置属性
 		// #ifndef MP-TOUTIAO
-		// fontWeight = fontWeight == 'bold' ? 'bold' : 'normal'
-		// textStyle = textStyle == 'italic' ? 'italic' : 'normal'
+		// fw = fw == 'bold' ? 'bold' : 'normal'
+		// ts = ts == 'italic' ? 'italic' : 'normal'
 		// #endif
 		// #ifdef MP-TOUTIAO
-		fontWeight = fontWeight == 'bold' ? 'bold' : ''
-		textStyle =  textStyle == 'italic' ? 'italic' : ''
+		fw = fw == 'bold' ? 'bold' : ''
+		ts =  ts == 'italic' ? 'italic' : ''
 		// #endif
-		fontSize = toPx(fontSize)
-		ctx.font = `${textStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+		// fs = toPx(fs)
+		ctx.font = `${ts} ${fw} ${fs}px ${ff}`;
 	}
-	
-	drawBackground(bd, w, h) {
-		const ctx = this.ctx
+	setTransform(box, {transform}) {
+		const {ctx} = this
+		const {
+			scaleX = 1,
+			scaleY = 1,
+			translateX = 0,
+			translateY = 0,
+			rotate = 0,
+			skewX = 0,
+			skewY = 0
+		} = transform || {}
+		let {
+			left: x,
+			top: y,
+			width: w,
+			height: h
+		} = box
+		
+		ctx.scale(scaleX, scaleY)
+		//  transform(scaleX, 0, 0, scaleY, 0, 0)
+		ctx.translate(
+			w * (scaleX > 0 ? 1 : -1) / 2 + (x + translateX) / scaleX,  
+			h * (scaleY > 0 ? 1 : -1) / 2 + (y + translateY) / scaleY) 
+		
+		if(rotate) {
+			ctx.rotate(rotate * Math.PI / 180)
+			// ctx.transform( Math.cos(a), Math.sin(a), -Math.sin(a),  Math.cos(a), 0, 0);
+		}
+		if(skewX || skewY) {
+			ctx.transform(1, Math.tan(skewY * Math.PI/180), Math.tan(skewX * Math.PI/180), 1 , 0, 0)
+			// ctx.transform(1, tanx, tany, 1, 0, 0);
+		}
+	}
+	setBackground(bd, w, h) {
+		const {ctx} = this
 		if (!bd) {
 			// #ifndef MP-TOUTIAO || MP-BAIDU
 			ctx.setFillStyle('transparent')
@@ -87,61 +119,22 @@ export class Draw {
 			ctx.setFillStyle(bd)
 		}
 	}
-	rotate({left: x, top: y, width: w, height: h}, {rotate}) {
-		const ctx = this.ctx
-		if (rotate) {
-			ctx.translate(x + w / 2, y + h / 2)
-			ctx.rotate(rotate * Math.PI / 180)
-			ctx.translate(-x - w / 2, -y - h / 2)
-		}
-	}
-	shadow({boxShadow = []}) {
-		const ctx = this.ctx
-		if (boxShadow.length) {
-			const [x, y, b, c] = boxShadow
+	setShadow({boxShadow: bs = []}) {
+		const {ctx} = this
+		if (bs.length) {
+			const [x, y, b, c] = bs
 			ctx.setShadow(x, y, b, c)
 		}
 	}
-	drawView(box, style) {
-		const ctx = this.ctx
-		const {
-			left: x,
-			top: y,
-			width: w,
-			height: h
-		} = box
+	setBorder(box, style) {
+		const {ctx} = this
 		let {
-			borderRadius = 0,
-			border,
-			borderTop,
-			borderBottom,
-			borderLeft,
-			borderRight,
-			color = '#000000',
-			backgroundColor: bg,
-			rotate,
-			shadow
-		} = style || {}
-		ctx.save()
-		// 旋转
-		this.rotate(box, style)
-		// 投影
-		this.shadow(style)
-		// 背景
-		this.drawBackground(bg, w, h)
-		this.roundRect(x, y, w, h, borderRadius, true, false)
-		ctx.restore()
-		this.drawBorder(box, style)
-	}
-	drawBorder(box, style) {
-		const ctx = this.ctx
-		const {
 			left: x,
 			top: y,
 			width: w,
 			height: h
 		} = box
-		const {border, borderBottom, borderTop, borderRight, borderLeft, borderRadius: r} = style;
+		const {border, borderBottom, borderTop, borderRight, borderLeft, borderRadius: r, opacity = 1} = style;
 		const {
 			borderWidth : bw = 0,
 			borderStyle : bs,
@@ -188,8 +181,10 @@ export class Draw {
 			}
 			ctx.setStrokeStyle(c)
 		}
-		const _drawBorder = (x1, y1, x2, y2, x3, y3, r1, r2, p1, p2, p3,  bw, bs, bc) => {
+		const _setBorder = (x1, y1, x2, y2, x3, y3, r1, r2, p1, p2, p3,  bw, bs, bc) => {
 			ctx.save()
+			this.setOpacity(style)
+			this.setTransform(box, style)
 			ctx.lineWidth = bw
 			_borderType(bw, bs, bc)
 			ctx.beginPath()
@@ -199,51 +194,87 @@ export class Draw {
 			ctx.stroke()
 			ctx.restore()
 		}
-
+	
 		if(border) {
 			ctx.save()
+			this.setOpacity(style)
+			this.setTransform(box, style)
 			_borderType(bw, bs, bc)
-			this.roundRect(x, y, w, h, r, false, bc ? true : false)
+			this.roundRect(-w/2, -h/2, w, h, r, false, bc ? true : false)
 			ctx.restore()
 		}
+		x = -w/2
+		y = -h/2
 		if(borderBottom) {
-			_drawBorder(x + w - br, y + h - br, x + bl, y + h, x + bl, y + h - bl, br, bl, 0.25, 0.5, 0.75, bbw, bbs, bbc)
+			_setBorder(x + w - br, y + h - br, x + bl, y + h, x + bl, y + h - bl, br, bl, 0.25, 0.5, 0.75, bbw, bbs, bbc)
 		}
 		if(borderLeft) {
 			// 左下角
-			_drawBorder(x + bl, y + h - bl, x, y + tl, x + tl, y + tl, bl, tl, 0.75, 1, 1.25, blw, bls, blc)
+			_setBorder(x + bl, y + h - bl, x, y + tl, x + tl, y + tl, bl, tl, 0.75, 1, 1.25, blw, bls, blc)
 		}
 		if(borderTop) {
 			// 左上角
-			_drawBorder(x + tl, y + tl, x + w - tr, y, x + w - tr, y + tr, tl, tr, 1.25, 1.5, 1.75, btw, bts, btc)
+			_setBorder(x + tl, y + tl, x + w - tr, y, x + w - tr, y + tr, tl, tr, 1.25, 1.5, 1.75, btw, bts, btc)
 		}
 		if(borderRight) {
 			// 右上角
-			_drawBorder(x + w - tr, y + tr, x + w, y + h - br, x + w - br, y + h - br, tr, br, 1.75, 2, 0.25, btw, bts, btc)
+			_setBorder(x + w - tr, y + tr, x + w, y + h - br, x + w - br, y + h - br, tr, br, 1.75, 2, 0.25, btw, bts, btc)
 		}
-		
+	}
+	setOpacity({opacity = 1}) {
+		this.ctx.setGlobalAlpha(opacity)
+	}
+	drawView(box, style) {
+		const {ctx} = this
+		const {
+			left: x,
+			top: y,
+			width: w,
+			height: h
+		} = box
+		let {
+			borderRadius = 0,
+			border,
+			borderTop,
+			borderBottom,
+			borderLeft,
+			borderRight,
+			color = '#000000',
+			backgroundColor: bg,
+			rotate,
+			shadow
+		} = style || {}
+		ctx.save()
+		this.setOpacity(style)
+		this.setTransform(box, style)
+		this.setShadow(style)
+		this.setBackground(bg, w, h)
+		this.roundRect(-w/2, -h/2, w, h, borderRadius, true, false)
+		ctx.restore()
+		this.setBorder(box, style)
 	}
 	async drawImage(img, box, style) {
 		await new Promise(async (resolve, reject) => {
-			const ctx = this.ctx
-			
+			const {ctx} = this
 			const canvas = this.canvas
 			const {
 				borderRadius = 0,
 				mode,
-				backgroundColor: bg
+				backgroundColor: bg,
 			} = style
-			const {
+			let {
 				left: x,
 				top: y,
 				width: w,
 				height: h
 			} = box
 			ctx.save()
-			// 背景
-			this.drawBackground(bg || 'white', w, h)
-			this.rotate(box, style)
-			this.shadow(style)
+			this.setOpacity(style)
+			this.setTransform(box, style)
+			this.setBackground(bg, w, h)
+			this.setShadow(style)
+			x = -w/2
+			y = -h/2
 			this.roundRect(x, y, w, h, borderRadius, true, false)
 			ctx.clip()
 			const _modeImage = (img) => {
@@ -264,75 +295,54 @@ export class Draw {
 					startX = Math.round(((img.width || w) - rWidth) / 2)
 				}
 				if (mode === 'scaleToFill' || !img.width) {
-					ctx.drawImage(img.path, x, y, w, h);
+					ctx.drawImage(img.src, x, y, w, h);
 				} else {
-					// 百度小程序 开发工具 有问题
-					ctx.drawImage(img.path, startX, startY, rWidth, rHeight, x, y, w, h)
+					// 百度小程序 开发工具 顺序有问题 暂不知晓真机
+					// #ifdef MP-BAIDU
+					ctx.drawImage(img.src, x, y, w, h, startX, startY, rWidth, rHeight)
+					// #endif
+					// #ifndef MP-BAIDU
+					ctx.drawImage(img.src, startX, startY, rWidth, rHeight, x, y, w, h)
+					// #endif
 				}
 			}
 			const _drawImage = (img) => {
-				if (this.use2dCanvas && !img.path.src) {
+				if (this.use2dCanvas) {
 					const Image = canvas.createImage()
 					Image.onload = () => {
-						img.path = Image
+						img.src = Image
 						_modeImage(img)
-						ctx.restore()
-						this.drawBorder(box, style)
-						resolve(true)
+						_restore()
 					}
 					Image.onerror = () => {
 						console.error(`createImage fail: ${img}`)
 						reject(new Error(`createImage fail: ${img}`))
 					}
-					Image.src = img.path
+					Image.src = img.src
 				} else {
 					_modeImage(img)
-					ctx.restore()
-					this.drawBorder(box, style)
-					resolve(true)
+					_restore()
 				}
 			}
-			
-			const baseReg = /^data:image\/(\w+);base64/
-			const localReg = /^\.|^\/(?=[^\/])/;
-			// #ifndef MP-ALIPAY || MP-BAIDU
-			if(baseReg.test(img) && !cache[img]) {
-				const imgName = img
-				img = await base64ToPath(img)
-				cache[imgName] = img
+			const _restore = () => {
+				setTimeout(() => {
+					ctx.restore()
+					this.setBorder(box, style)
+					resolve(true)
+				}, 1000/30)
+				 
 			}
-			// #endif
-			if(cache[img] && cache[img].errMsg) {
-				_drawImage(cache[img])
-			} else {
-				uni.getImageInfo({
-					src: img,
-					success: (image) => {
-						image.path = /^(http|\/\/|\/|wxfile|data:image\/(\w+);base64|file|bdfile|ttfile|blob)/.test(image.path) ? image.path : `/${image.path}`;
-						cache[img] = image
-						_drawImage(image)
-					},
-					fail(err) {
-						if(localReg.test(img) || baseReg.test(img)) {
-							_drawImage({path: img})
-						} else {
-							console.error(`getImageInfo:fail ${img} failed ${JSON.stringify(err)}`);
-							reject(new Error(`getImageInfo:fail ${img} ${JSON.stringify(err)}`));
-						}
-					}
-				})
-			}
-			
+			 _drawImage(img)
 		})
 	}
-	// eslint-disable-next-line complexity
-	drawText(text, box, style) {
-		const ctx = this.ctx
+	drawText(text, box, style, rules) {
+		const {ctx} = this
 		let {
 			left: x,
 			top: y,
 			width: w,
-			height: h
+			height: h,
+			offsetLeft: ol = 0
 		} = box
 		let {
 			color = '#000000',
@@ -347,26 +357,43 @@ export class Draw {
 			maxLines,
 			textDecoration: td
 		} = style
-		if (typeof lineHeight === 'string') { // 1.4em
-			lineHeight = Math.ceil(parseFloat(lineHeight.replace('em')) * fontSize)
-		}
-		//  || (lineHeight > h)
+		lineHeight = this.getLineHeight(lineHeight, fontSize)
+		
 		if (!text) return
 		ctx.save()
+		this.setOpacity(style)
+		this.setTransform(box, style)
+		x = -w/2
+		y = -h/2
 		ctx.setTextBaseline(va)
-		// 设置属性
 		this.setFont({fontFamily, fontSize, fontWeight, textStyle})
 		ctx.setTextAlign(textAlign)
-		
-		// 背景色
 		if(bg) {
-			this.drawBackground(bg, w, h)
+			this.setBackground(bg, w, h)
 			this.roundRect(x, y, w, h, 1, bg)
 		 }
-		 this.rotate(box, style)
-		 this.shadow(style)
-		// 文字颜色
+		this.setShadow(style)
 		ctx.setFillStyle(color)
+		let rulesObj = {};
+		if(rules) {
+			if (rules.word.length > 0) {
+				for (let i = 0; i < rules.word.length; i++) {
+					let startIndex = 0,
+						index;
+					while ((index = text.indexOf(rules.word[i], startIndex)) > -1) {
+						rulesObj[index] = { 
+							reset: true
+						};
+						for (let j = 0; j < rules.word[i].length; j++) {
+							rulesObj[index + j] = { 
+								reset: true
+							};
+						}
+						startIndex = index + 1;
+					}
+				}
+			}
+		}
 		// 水平布局
 		switch (textAlign) {
 			case 'left':
@@ -459,11 +486,61 @@ export class Draw {
 				ctx.stroke();
 			}
 		}
-		
+		const _reset = (text, x, y) => {
+			const rs = Object.keys(rulesObj)
+			for (let i = 0; i < rs.length; i++) {
+				const item = rulesObj[rs[i]]
+				// ctx.globalCompositeOperation = "destination-out";
+				ctx.save();
+				// ctx.clearRect(item.x, item.y, item.w, item.h)
+				ctx.setFillStyle(rules.color);
+				if(item.char) {
+					ctx.fillText(item.char, item.x , item.y)
+				}
+				ctx.restore();
+			}
+		}
+		const _setText = (isReset, char) => {
+			if(isReset) {
+				const t1 = this.measureText('\u0020', fontSize)
+				const t2 = this.measureText('\u3000', fontSize)
+				const t3 = this.measureText(char, fontSize)
+				let _char = ''
+				let _num = 1
+				if(t3 == t2){
+					_char ='\u3000'
+					_num = 1
+				} else {
+					_char = '\u0020'
+					_num = Math.ceil(t3 / t1)
+				}
+				return new Array(_num).fill(_char).join('')
+			} else {
+				return char
+			}
+		}
+		const _setRulesObj = (text, index, x, y) => {
+			rulesObj[index].x = x
+			rulesObj[index].y = y
+			rulesObj[index].char = text
+		}
 		const inlinePaddingTop = Math.ceil((lineHeight - fontSize) / 2)
 		// 不超过一行
-		if (textWidth <= w && !text.includes('\n')) {
-			ctx.fillText(text, x, y + inlinePaddingTop)
+		if (textWidth + ol <= w && !text.includes('\n')) {
+			x = x + ol
+			const rs = Object.keys(rulesObj)
+			let _text = text.split('')
+			if(rs) {
+				for (let i = 0; i < rs.length; i++) {
+					const index = rs[i]
+					const t = _text[index]
+					let char = _setText(rulesObj[index], t) 
+					_text[index] = char
+					_setRulesObj(t, index, x + this.measureText(text.substring(0, index), fontSize), y + inlinePaddingTop)
+				}
+				_reset()
+			}
+			ctx.fillText(_text.join(''), x, y + inlinePaddingTop)
 			y += lineHeight
 			_drawLine(x, y, textWidth)
 			ctx.restore()
@@ -472,24 +549,35 @@ export class Draw {
 		// 多行文本
 		const chars = text.split('')
 		const _y = y
+		let _x = x
 		// 逐行绘制
 		let line = ''
 		let lineIndex = 0
 		let textArray = []
+		
 		for(let index = 0 ; index <= chars.length; index++){
 			let ch = chars[index] 
 			const isLine = ch === '\n'
 			const isRight = index === chars.length - 1
 			ch = isLine ? '' : ch
-			let testLine = line + ch
-			const testWidth = this.measureText(testLine, fontSize)
+			let textline = line + _setText(rulesObj[index], ch)
+			let testWidth = this.measureText(textline, fontSize)
+			if(rulesObj[index]) {
+				_setRulesObj(ch, index, _x + testWidth - this.measureText(ch, fontSize), y + inlinePaddingTop)
+			}
 			// 绘制行数大于最大行数，则直接跳出循环
 			if (lineIndex >= maxLines) {
 				break;
 			}
+			if(lineIndex == 0) {
+				testWidth = testWidth + ol
+				_x = x + ol
+			} else {
+				_x = x
+			}
 			if (testWidth > w || isLine || isRight) {
 				lineIndex++
-				line = isRight && testWidth <= w ? testLine : line
+				line = isRight && testWidth <= w ? textline : line
 				if(lineIndex === maxLines && testWidth > w) {
 					while( this.measureText(`${line}...`, fontSize) > w) {
 						if (line.length <= 1) {
@@ -497,28 +585,38 @@ export class Draw {
 							break;
 						}
 						line = line.substring(0, line.length - 1);
+						if(rulesObj[index - 1]) {
+							rulesObj[index - 1].char = ''
+						}
 					}
+					
 					line += '...'
 				}
 				textArray.push(line)
-				ctx.fillText(line, x, y + inlinePaddingTop)
+				ctx.fillText(line, _x, y + inlinePaddingTop)
 				y += lineHeight
-				_drawLine(x, y, testWidth)
+				_drawLine(_x, y, testWidth)
 				line = ch
 				if ((y + lineHeight) > (_y + h)) break
 			} else {
-				line = testLine
+				line = textline
 			}
+		}
+		const rs = Object.keys(rulesObj)
+		if(rs) {
+			_reset()
 		}
 		ctx.restore()
 	}
-	findNode(element, parent = {}, index = 0, siblings = [], source) {
+	async findNode(element, parent = {}, index = 0, siblings = [], source) {
 		let computedStyle = Object.assign({}, this.getComputedStyle(element, parent, index));
+		let attributes = await this.getAttributes(element)
 		let node = {
 			id: id++,
 			parent,
 			computedStyle,
-			attributes: Object.assign({}, this.getAttributes(element)),
+			rules: element.rules,
+			attributes: Object.assign({}, attributes),
 			name: element?.type || 'view',
 		}
 		if(JSON.stringify(parent) === '{}') {
@@ -531,24 +629,36 @@ export class Draw {
 		if (element?.views) {
 			let childrens = []
 			node.children = []
-			element.views.forEach((v, i) => {
-				childrens.push(this.findNode(v, node, i, childrens, element))
-			 })
+			for (let i = 0; i < element.views.length; i++) {
+				let v = element.views[i]
+				childrens.push(await this.findNode(v, node, i, childrens, element))
+			}
 			 node.children = childrens
 		}
 		return node
 	}
+	getLineHeight(lineHeight = '1.4em', fontSize = 14) {
+		if(/em$/.test(lineHeight)) {
+			return Math.ceil(parseFloat(lineHeight.replace('em')) * toPx(fontSize))
+		} else {
+			return /px$/.test(lineHeight) ? toPx(lineHeight) : lineHeight
+		}
+	}
 	getComputedStyle(element, parent = {}, index = 0) {
 		const style = {}
+		const node = JSON.stringify(parent) == '{}' ? element :  element.css ;
 		if(parent.computedStyle) {
 			for (let value of Object.keys(parent.computedStyle)){
 				const item = parent.computedStyle[value]
 				if(['color', 'fontSize', 'lineHeight', 'verticalAlign', 'fontWeight', 'textAlign'].includes(value)) {
-					style[value] = /px$/.test(item) ? toPx(item) : item
+					if(/em$/.test(item) && 'lineHeight'.includes(value)) {
+						style[value] = this.getLineHeight(item, node?.fontSize)
+					} else {
+						style[value] = /px$/.test(item) ? toPx(item) : item
+					}
 				}
 			}
 		}
-		const node = JSON.stringify(parent) == '{}' ? element :  element.css ;
 		if(!node) return style
 		for (let value of Object.keys(node)) {
 			const item = node[value]
@@ -598,9 +708,9 @@ export class Draw {
 						let [t, r, b, l] = v
 						style[type] = {
 							[pre[0]]: t,
-							[pre[1]]: r || t,
-							[pre[2]]: b || t,
-							[pre[3]]: l || r
+							[pre[1]]: isNumber(r) ? r : t,
+							[pre[2]]: isNumber(b) ? b : t,
+							[pre[3]]: isNumber(l) ? l : r
 						}
 					}
 				} else {
@@ -618,7 +728,45 @@ export class Draw {
 				}
 				continue
 			}
-			style[value] = /%|px|rpx$/.test(item) ? toPx(item, node['width']) : item
+			if(value.includes('width') || value.includes('height')) {
+				if(/%$/.test(item)) {
+					style[value] = toPx(item, parent.layoutBox[value])
+				} else {
+					style[value] = /px|rpx$/.test(item) ? toPx(item) : item
+				}
+				continue
+			}
+			if(value.includes('transform')) {
+				style[value]= {}
+				item.replace(/([a-zA-Z]+)\(([0-9,-\.%rpxdeg\s]+)\)/g, (g1, g2, g3) => {
+					const v = g3.split(',').map(k => k.replace(/(^\s*)|(\s*$)/g,''))
+					const transform = (v, r) => {
+						return v.includes('deg') ? v * 1 : toPx(v, r)
+					}
+					if(g2.includes('matrix')) {
+						style[value][g2] = v.map(v => v * 1)
+					} else if(g2.includes('rotate')) {
+						style[value][g2] = g3.match(/\d+/)[0] * 1
+					}else if(/[X, Y]/.test(g2)) {
+						style[value][g2] = /[X]/.test(g2) ? transform(v[0], node['width']) : transform(v[0], node['height'])
+					} else {
+						style[value][g2+'X'] = transform(v[0], node['width'])
+						style[value][g2+'Y'] = transform(v[1] || v[0], node['height'])
+					}
+				})
+				continue
+			}
+			if(/em$/.test(item) && !value.includes('lineHeight')) {
+				style[value] =  Math.ceil(parseFloat(item.replace('em')) * toPx(node['fontSize'] || 14))
+			} else {
+				style[value] = /%|px|rpx$/.test(item) ? toPx(item, node['width']) : item
+			}
+		}
+		if((element.name == 'image' || element.type == 'image') && !style.mode) {
+			style.mode = 'aspectFill'
+			if((!node.width || node.width == 'auto') && (!node.height || node.width == 'auto') ) {
+				style.mode = ''
+			} 
 		}
 		return style
 	}
@@ -626,126 +774,159 @@ export class Draw {
 		let box = {}
 		let {name, computedStyle: cstyle, layoutBox, attributes} = element || {}
 		if(!name) return box
-		const isText = name === 'text'
-		const isParentText = parent.name ==='text'; 
-		const ctx = this.ctx
+		const {ctx} = this
+		
 		const pbox = parent.layoutBox
 		const pstyle = parent.computedStyle
-		const { verticalAlign: va }  = cstyle
-		// 获取left
+		const { verticalAlign: va, left: x, top: y }  = cstyle;
+		
 		const { paddingTop: pt = 0, paddingRight: pr = 0, paddingBottom: pb = 0, paddingLeft: pl = 0, } = cstyle.padding || {}
 		const { marginTop: mt = 0, marginRight: mr = 0, marginBottom: mb = 0, marginLeft: ml = 0, } = cstyle.margin || {}
-		const getNodeLeft = () => {
-			if(typeof cstyle.left === 'number') {
-				return cstyle.left + pl + ml
-			}
-			// 如果是块元素
-			if(!isText) {
-				return (pbox?.left || 0) + pl + ml
-			}
-			// 如果是第1个元素
-			const isLeft = index == 0
-			if(isLeft) {
-				// 如果父级是文本
-				if(isParentText) {
-					return (pbox?.left || 0) + (pbox?.width || 0) + pl + ml
-				} else {
-					return (pbox?.left || 0) + pl + ml
-				}
-			} else {
-				const {layoutBox: lbox, computedStyle: ls} = siblings[index - 1]
-				return lbox.left + lbox.width + pl + ml + (ls?.padding?.paddingRight || 0) + (ls?.margin?.marginRight || 0)
-			}
-		}
 		
-		// 获取宽度
-		const getNodeWidth = () => {
-			if(typeof cstyle.width === 'number') {
-				return cstyle.width - pl - pr
-			}
-			if(!isText || isText && cstyle.textAlign && cstyle.textAlign !== 'left') {
-				return pbox?.width - pl - pr
-			}
-			if(isText) {
-				let {
-					fontSize = 14,
-					lineHeight = '1.4em',
-					fontWeight,
-					fontFamily,
-					textStyle
-				} = cstyle || {}
-				this.setFont({fontFamily, fontSize, fontWeight, textStyle})
-				let width = this.measureText(attributes.text, fontSize)
-				if(!isParentText) {
-					if(width < (pbox?.width || 0)) {
-						return width
-					} else {
-						return pbox?.width || 0
-					}
-				} else {
-					const {layoutBox: pb} = this.getParent(parent, 'view')
-					const maxWidth = (pb.width + pb.left) - box.left
-					return  maxWidth > width ? width : maxWidth
-				}
-			}
-		}
-		// 获取高度
-		const getNodeHeight = () => {
-			const { height } = cstyle
-			if(cstyle.height) {
-				return cstyle.height
-			}
-			if(!isText) {
-				return 0
-			}
+		if(name === 'text') {
+			let {
+				fontSize = 14,
+				lineHeight = '1.4em',
+				fontWeight,
+				fontFamily,
+				textStyle
+			} = cstyle || {}
 			
-			// 如果父级有高度
-			if((pbox.height == pstyle.height && pstyle.height != 0) && (va != 'bottom' && va != 'middle')) {
-				return pbox.height
-			}
-			// 如果父级没有高度
-			else {
-				let {
-					fontSize = 14,
-					lineHeight = '1.4em',
-				} = cstyle || {}
-				if (typeof lineHeight === 'string') { // 1.4em
-					lineHeight = Math.ceil(parseFloat(lineHeight.replace('em')) * fontSize)
+			lineHeight = this.getLineHeight(lineHeight, fontSize)
+			ctx.save()
+			this.setFont({fontFamily, fontSize, fontWeight, textStyle})
+			const {layoutBox: lbox, computedStyle: ls} = siblings[index - 1] || {}
+			const isLeft = index == 0
+			const isblock = cstyle.display === 'block'
+			const isLblock = ls?.display === 'block'
+			
+			const lboxR = (isLeft || isblock ? 0 : lbox.offsetRight || 0)
+			let texts = (attributes.text||'').split('\n')
+			let length = texts.length
+			let widths = texts.map((text, i) => {
+				let o = this.measureText(text, fontSize)
+				let w = o
+				if(i == 0) {
+					w = lboxR + o
+					if(length > 1) {
+						w = Math.ceil(w / pbox.width) * pbox.width
+					}
+				} else if(i < length - 1) {
+					w = Math.ceil(w / pbox.width) * pbox.width //w
+				} else {
+					w = o
 				}
-				let width = this.measureText(attributes.text, fontSize)
-				if(pbox.width < width) {
-					lineHeight = Math.ceil(width / pbox.width) * lineHeight
+				// if(pbox.width - w < this.measureText(' ', fontSize)) {
+				// 	w = w + this.measureText(' ', fontSize)
+				// }
+				return Math.ceil(w)
+			}).reduce((c, v) => c + v , 0)
+			let width = widths;
+			const line = `${width / pbox.width}`
+			const lines = Math.ceil(line)
+			const ceill = Math.ceil(`${line}`.replace(/\d+/, '0') * pbox.width) || 0
+			box.offsetRight = cstyle.width ? cstyle.width : isblock ? pbox.width : ceill ;
+			box.offsetLeft = (isNumber(x) || isblock || isLblock ? 0 : lboxR)  +  (cstyle.textIndent || 0)
+			const _getLeft = () => {
+				return (cstyle.left || pbox.left) + pl + ml
+			}
+			const _getWidth = () => {
+				return cstyle.width || (isblock ? pbox.width : (width > pbox.width - box.left || lines > 1 ?  pbox.width - box.left : width))
+			}
+			const _getHeight = () => {
+				// pbox.height = pbox.height > lineHeight ? pbox.height : lineHeight;
+				if(width > pbox.width) {
+					return lines * lineHeight + pt + pb + mt + mb
+				} else {
+					return lineHeight + pt + pb + mt + mb
 				}
-				pbox.height = pbox.height > lineHeight ? pbox.height : lineHeight;
-				return lineHeight
-			} 
-		}
-		
-		// 获取top
-		const getNodeTop = () => {
-			if(cstyle.top) {
-				return cstyle.top + pt + mt
 			}
-			if(va === 'bottom') {
-				return pbox?.top + (pbox?.height - box.height || 0)  + pt + mt
-			} 
-			if(va === 'middle') {
-				return pbox?.top + (pbox?.height - box.height  || 0) / 2 + pt + mt
+			const _getTop = () => {
+				let _top = y
+				if(_top) {
+					return _top + pt + mt
+				}
+				if(isLeft) {
+					_top = pbox.top
+				} else if(lbox.width < pbox.width) {
+					_top = lbox.top
+				} else {
+					_top = lbox.top + lbox.height - (ls?.lineHeight || 0)
+				}
+				if (va === 'bottom') {
+					_top = pbox?.top + (pbox?.height - box.height || 0)
+				}
+				if (va === 'middle') {
+					_top = pbox?.top + (pbox?.height - box.height || 0) / 2
+				}
+				return _top + pt + mt + ((isblock || isLblock) && ls?.lineHeight || 0 )
 			}
-			return (pbox?.top || 0) + pt + mt
+			box.left = _getLeft() 
+			box.width = _getWidth() 
+			box.height = _getHeight()
+			box.top = _getTop()
+			ctx.restore()
+		} else if(name === 'view') {
+			box.left = x || pbox.left
+			box.width = (cstyle.width || pbox?.width) - pl - pr
+			box.height = cstyle.height || 0
+			box.top = cstyle.top || pbox.top
+		} else if(name === 'image') {
+			box.left = x || pbox.left
+			box.width = (cstyle.width || pbox?.width) - pl - pr
+			const {
+				width: rWidth,
+				height: rHeight
+			} = attributes
+			box.height = cstyle.height || box.width * rHeight / rWidth // pbox?.height - pl - pr
+			box.top = cstyle.top || pbox.top
 		}
-		box.left = getNodeLeft()
-		
-		ctx.save()
-		box.width = getNodeWidth()
-		box.height = getNodeHeight()
-		// 获取top
-		box.top = getNodeTop()
-		
-		ctx.restore()
 		return box
 	}
-	
+	getImageInfo(img) {
+		return new Promise(async (resolve, reject) => {
+			const base64Reg = /^data:image\/(\w+);base64/
+			const localReg = /^\.|^\/(?=[^\/])/;
+			const networkReg = /^(http|\/\/)/
+			// #ifdef H5
+			if(networkReg.test(img) && this.isH5PathToBase64) {
+				img = await pathToBase64(img)
+			}
+			// #endif
+			// #ifndef MP-ALIPAY 
+			if(base64Reg.test(img)) {
+				if(!cache[img]) {
+					const imgName = img
+					img = await base64ToPath(img)
+					cache[imgName] = img
+				} else {
+					img = cache[img]
+				}
+			}
+			// #endif
+			if(cache[img] && cache[img].errMsg) {
+				resolve(cache[img])
+			} else {
+				uni.getImageInfo({
+					src: img,
+					success: (image) => {
+						// #ifdef MP-WEIXIN || MP-BAIDU || MP-QQ || MP-TOUTIAO
+						image.path = localReg.test(img) ?  `/${image.path}` : image.path;
+						// #endif
+						// image.path = /^(http|\/\/|\/|wxfile|data:image\/(\w+);base64|file|bdfile|ttfile|blob)/.test(image.path) ? image.path : `/${image.path}`;
+						cache[img] = image
+						resolve(cache[img])
+					},
+					fail(err) {
+						resolve({path: img})
+						console.error(`getImageInfo:fail ${img} failed ${JSON.stringify(err)}`);
+					}
+				})
+			}
+			
+		})
+		
+	}
 	getParent(element, name) {
 		if(element.name === name) {
 			return element
@@ -753,10 +934,12 @@ export class Draw {
 			return this.getParent(element.parent, name)
 		}
 	}
-	getAttributes(element) {
+	async getAttributes(element) {
 		let arr = { }
 		if(element?.url || element?.src) {
-			arr.src = element.url || element?.src
+			arr.src = element.url || element?.src;
+			const {width = 0, height = 0, path: src} = await this.getImageInfo(arr.src) || {}
+			arr = Object.assign({}, arr, {width, height, src})
 		}
 		if(element?.text) {
 			arr.text = element.text
@@ -764,14 +947,15 @@ export class Draw {
 		return arr
 	}
 	async drawBoard(element) {
-		const node = this.findNode(element)
+		const node = await this.findNode(element)
 		return this.drawNode(node)
 	}
 	async drawNode(element) {
 		const {
 			layoutBox,
 			computedStyle,
-			name
+			name,
+			rules
 		} = element
 		const {
 			src,
@@ -780,9 +964,9 @@ export class Draw {
 		if (name === 'view') {
 			this.drawView(layoutBox, computedStyle)
 		} else if (name === 'image' && src) {
-			await this.drawImage(src, layoutBox, computedStyle)
+			await this.drawImage(element.attributes, layoutBox, computedStyle)
 		} else if (name === 'text') {
-			this.drawText(text, layoutBox, computedStyle)
+			this.drawText(text, layoutBox, computedStyle, rules)
 		}
 		if (!element.children) return
 		const childs = Object.values ? Object.values(element.children) : Object.keys(element.children).map((key) => element.children[key]);

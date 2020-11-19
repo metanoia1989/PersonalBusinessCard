@@ -51,14 +51,20 @@
           <el-form-item label="邮箱">
             <el-input v-model="form.email" />
           </el-form-item>
-          <el-form-item label="公司">
-            <el-input v-model="form.company" />
-          </el-form-item>
           <el-form-item label="网址">
             <el-input v-model="form.website" />
           </el-form-item>
+          <el-form-item label="公司">
+            <el-input v-model="form.company" />
+          </el-form-item>
           <el-form-item label="地址">
             <el-input v-model="form.address" />
+          </el-form-item>
+          <el-form-item label="纬度">
+            <el-input v-model="form.latitude" />
+          </el-form-item>
+          <el-form-item label="经度">
+            <el-input v-model="form.longitude" />
           </el-form-item>
           <el-form-item label="主题颜色">
             <el-color-picker
@@ -96,11 +102,14 @@ export default {
         website: '',
         address: '',
         theme_color: '',
+        latitude: 0,
+        longitude: 0,
       },
       upload_url, // 图片上传地址
       tagInputVisible: false, // tag输入框
       tagInputValue: '', // tag输入框值
       predefineColors: [
+        '#37538f',
         '#ff4500',
         '#ff8c00',
         '#ffd700',

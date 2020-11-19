@@ -3,8 +3,8 @@
 		<view class="status_bar" :style="{ backgroundColor: primary_color }">
 			<!-- 状态栏占位 -->
 		</view>
-		<view class="container">
-			<image class="avatar" src="../../static/images/avatar.jpg" mode="scaleToFill"></image>
+		<view class="container" :style="root_style">
+			<image class="avatar" :src="profile.avatar" mode="scaleToFill"></image>
 			<view class="share-group">
 				<view class="share-btn" @tap="callPhone">
 					<uni-icons type="phone-filled" :size="share_icon_size" :color="primary_color"></uni-icons>
@@ -42,50 +42,39 @@
 			<view class="content-box">
 				<view class="header">
 					<view class="title-box">
-						<text class="title">杨茂珍</text>
-						<text class="subtitle">招生老师</text>
+						<text class="title">{{profile.name}}</text>
+						<text class="subtitle">{{profile.position}}</text>
 					</view>
 					<view class="tags-box">
-						<text class="tag">消防培训</text>
-						<text class="tag">消防信息</text>
-						<text class="tag">消防设施操作员</text>
-						<text class="tag">消防咨询</text>
+						<text class="tag" v-for="item in profile.tags" :key="item">{{item}}</text>
 					</view>
 				</view>
 				<view class="description">
-					<view>
-						广东省安卓消防职业培训学院，主要提供初级、中级消防设施操作员、一级注册消防工程师。
-					</view>
-
-					<view>
-						安卓消防学院 坚持“办学高起步、管理高标准、服务高水平、培训高质量”理念，提供专业的消防考证培训，线上课程加线下培训，全省20个地区均设有培训点，方便高效。
-					</view>
-
-					<view>
-						百度搜索“安卓消防培训学院” “安卓消防”了解更多…..
+					<view v-for="item in profile.description" :key="item">
+						{{item}}
 					</view>
 				</view>
 				<view class="contact-box">
 					<view class="contact-line">
 						<uni-icons type="phone-filled" :color="primary_color"></uni-icons>
-						<text @tap="copyText" data-text="15013245515">15013245515（同微信）-点击可复制</text>
+						<text @tap="copyText" :data-text="profile.phone">{{profile.phone}}（同微信）-点击可复制</text>
 					</view>
 					<view class="contact-line">
 						<uni-icons type="email-filled" :color="primary_color"></uni-icons>
-						<text @tap="copyText" data-text="2219035987@qq.com">2219035987@qq.com</text>
+						<text @tap="copyText" :data-text="profile.email">{{profile.email}}</text>
 					</view>
 					<view class="contact-line">
 						<uni-icons type="info-filled" :color="primary_color"></uni-icons>
-						<text @tap="copyText" data-text="广东省安卓消防职业培训学院">广东省安卓消防职业培训学院</text>
+						<text @tap="copyText" :data-text="profile.company">{{profile.company}}</text>
 					</view>
 					<view class="contact-line">
 						<uni-icons type="paperclip" :color="primary_color"></uni-icons>
-						<text @tap="copyText" data-text="http://www.anzhuoxfpx.com/">http://www.anzhuoxfpx.com/</text>
+						<text @tap="copyText" :data-text="profile.website">{{profile.website}}</text>
 					</view>
 					<view class="contact-line">
 						<uni-icons type="location-filled" :color="primary_color"></uni-icons>
-						<text @tap="copyText" data-text="广州市天河区高科路37号国家大学科技园B栋1-2楼（总部）">
-							广州市天河区高科路37号国家大学科技园B栋1-2楼（总部）
+						<text @tap="copyText" :data-text="profile.address">
+							{{profile.address}}
 						</text>
 					</view>
 					<view class="contact-line">
@@ -108,8 +97,9 @@
 		<view class="painter-box" v-if="isShowPainter" @longtap="saveImage">
 			<l-painter
 			  isRenderImage
+              :isH5PathToBase64="true"
 			  custom-style=""
-			  :board="base" 
+			  :board="placard" 
 			  @success="image_path = $event"
 			/>
 			<view class="painter-tips">长按保存到相册</view>
@@ -123,6 +113,7 @@
 		setClipboardData
 	} from '@/js_sdk/u-clipboard/index.js'
 	import LPainter from '@/components/lime-painter/index.vue'
+	import request from '@/utils/request'
 
 	export default {
 		components: {
@@ -130,126 +121,192 @@
 		},
 		data() {
 			return {
+                profile: {
+                    name: '',
+                    avatar: '',
+                    position: '',
+                    tags: [],
+                    description: '',
+                    phone: '',
+                    email: '',
+                    company: '',
+                    website: '',
+                    address: '',
+                    theme_color: '',
+                    latitude: 0,
+                    longitude: 0  
+                },
 				href: '',
 				primary_color: '#37538f', // 图标主题色
+                root_style: '--primary-color: #37538f',
 				share_icon_size: 35, // 分享按钮图标的大小
 				contact_me_shake: false, // 联系我按钮的晃动
 				phone: '15013245515',
-				timer: null, // 按钮晃动定时器,
-				
+				timer: null, // 按钮晃动定时器
 				image_path: "",
 				isShowPainter: false,
-				base: {
-					width: '600rpx',
-					height: '800rpx',
-					background: '#F6F7FB',
-					views: [
-						{
-							type: 'view',
-							css: {
-								left: '40rpx',
-								top: '144rpx',
-								background: '#fff',
-								radius: '16rpx',
-								width: '600rpx',
-								height: '930rpx',
-								shadow: '0 20rpx 48rpx rgba(0,0,0,.05)'
-							}
-						},
-						{
-							type: 'image',
-							src: '../../static/images/avatar.jpg',
-							mode: 'widthFix',
-							css: {
-								left: '40rpx',
-								top: '40rpx',
-								width: '84rpx',
-								height: '84rpx',
-								radius: '50%',
-								color: '#999'
-							}
-						},
-						{
-							type: 'text',
-							text: '隔壁老王',
-							css: {
-								color: '#333',
-								left: '144rpx',
-								top: '40rpx',
-								fontSize: '32rpx',
-								fontWeight: 'bold'
-							}
-						},
-						{
-							type: 'text',
-							text: '为您挑选了一个好物',
-							css: {
-								color: '#666',
-								left: '144rpx',
-								top: '90rpx',
-								fontSize: '24rpx'
-							}
-						},
-						{
-							type: 'image',
-							src: '../../static/images/avatar.jpg',
-							mode: 'widthFix',
-							css: {
-								left: '72rpx',
-								top: '176rpx',
-								width: '606rpx',
-								height: '606rpx',
-								radius: '12rpx'
-							}
-						},
-						{
-							type: 'text',
-							text: '￥39.90',
-							css: {
-								color: '#FF0000',
-								left: '66rpx',
-								top: '812rpx',
-								fontSize: '56rpx',
-								fontWeight: 'bold'
-							}
-						},
-						{
-							type: 'text',
-							text: '360儿童电话手表9X 智能语音问答定位支付手表 4G全网通20米游泳级防水视频通话拍照手表男女孩星空蓝',
-							css: {
-								maxLines: 2,
-								width: '396rpx',
-								color: '#333',
-								left: '72rpx',
-								top: '948rpx',
-								fontSize: '36rpx',
-								lineHeight: '50rpx'
-							}
-						},
-						{
-							type: 'image',
-							src: '../../static/images/qrcode.jpg',
-							mode: 'widthFix',
-							css: {
-								left: '500rpx',
-								top: '864rpx',
-								width: '178rpx',
-								height: '178rpx'
-							}
-						}
-					]
-				},
 				
+                // 屏幕宽度和高度做适配处理
+                screenWidth: 400,
+                screenHeight: 700,
+                areaTop: 0,
 			}
 		},
+        computed: {
+            placard: function () {
+                var width = this.screenWidth * 0.8;
+                var height = width * 1.2;
+                var left = ( this.screenHeight - width ) / 2;
+                var top = this.top + 80;
+
+
+                return  {
+                    width: width + "px",
+                    height: height + 'px',
+                    background: '#F6F7FB',
+                    views: [
+                        {
+                            type: 'view',
+                            css: {
+                                left: '10px',
+                                top: '10px',
+                                background: '#fff',
+                                radius: '16rpx',
+                                width: width - 20 + 'px',
+                                height: height - 20 + 'px',
+                                shadow: '0 20rpx 48rpx rgba(0,0,0,.05)'
+                            }
+                        },
+                        {
+                            type: 'image',
+                            src: this.profile.avatar,
+                            // src: '../../static/images/avatar.jpg',
+                            mode: 'widthFix',
+                            css: {
+                                left: '40rpx',
+                                top: '40rpx',
+                                width: '84rpx',
+                                height: '84rpx',
+                                radius: '50%',
+                                color: '#999'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            text: this.profile.name,
+                            css: {
+                                color: '#333',
+                                left: '144rpx',
+                                top: '40rpx',
+                                fontSize: '32rpx',
+                                fontWeight: 'bold'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            text: this.profile.position,
+                            css: {
+                                color: '#666',
+                                left: '250rpx',
+                                top: '50rpx',
+                                fontSize: '24rpx'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            text: this.profile.tags.splice(0, 3).join(" | "),
+                            css: {
+                                color: '#666',
+                                left: '144rpx',
+                                top: '90rpx',
+                                fontSize: '24rpx'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            text: '电话：' + this.profile.phone + '（同微信）',
+                            css: {
+                                color: '#666',
+                                left: '60rpx',
+                                top: '160rpx',
+                                fontSize: '30rpx'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            text: '邮箱：' + this.profile.email,
+                            css: {
+                                color: '#666',
+                                left: '60rpx',
+                                top: '210rpx',
+                                fontSize: '30rpx'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            text: '公司：' + this.profile.company,
+                            css: {
+                                color: '#666',
+                                left: '60rpx',
+                                top: '260rpx',
+                                fontSize: '30rpx'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            text: '网址：' + this.profile.website,
+                            css: {
+                                color: '#666',
+                                left: '60rpx',
+                                top: '310rpx',
+                                fontSize: '30rpx'
+                            }
+                        },
+                        {
+                            type: 'text',
+                            text: '地址：' + this.profile.address,
+                            css: {
+                                color: '#666',
+                                left: '60rpx',
+                                top: '360rpx',
+                                fontSize: '30rpx'
+                            }
+                        },
+                        {
+                            type: 'image',
+                            src: '../../static/images/qrcode.jpg',
+                            mode: 'widthFix',
+                            css: {
+                                left: width * 0.35 + 'px',
+                                top: height * 0.68 + 'px',
+                                width: '178rpx',
+                                height: '178rpx'
+                            }
+                        }
+                    ]
+                };
+            }
+       },
 		methods: {
 			onLoad() {
+                // 获取名片详细信息
+                this.fetchProfile();
+                
+                // 获取屏幕宽度和高度
+                uni.getSystemInfo({
+                    success: (res) => {
+                        this.screenWidth = res.safeArea.width;
+                        this.screenHeight = res.safeArea.height;
+                        this.areaTop = res.safeArea.top;
+                    }
+                });
+                
+                // 联系我图标晃动
 				// #ifdef MP-WEIXIN
 				this.timer = setInterval(() => {
 					this.contactMeShake();
 				}, 20 * 1000);				
 				// #endif
-
 			},
 			onUnload() {
 				// #ifdef MP-WEIXIN
@@ -262,8 +319,18 @@
 			 * 页面开启下拉刷新
 			 */
 			onPullDownRefresh() {
-				setTimeout(() => uni.stopPullDownRefresh(), 1500);
+                this.fetchProfile();
 			},
+            
+            fetchProfile() {
+				const url = '/card/profile/details?desc=1';
+				(new request).requestAll(url).then(res => {
+                    this.profile = res;
+                    this.primary_color = res.theme_color;
+                    this.root_style = '--primary-color: ' + res.theme_color;
+                    uni.stopPullDownRefresh();
+				});                
+            },
 			/**
 			 * 联系我按钮晃动1s时间
 			 * 
@@ -305,13 +372,11 @@
 			 * 打开安卓消防学院位置
 			 */
 			openLocation() {
-				var latitude = 23.187087;
-				var longitude = 113.410169;
 				uni.openLocation({
-					latitude: latitude,
-					longitude: longitude,
-					name: "广东省安卓消防职业培训学院",
-					address: "广州市天河区高科路37号国家大学科技园B栋1-2楼（总部）",
+					latitude: this.profile.latitude,
+					longitude: this.profile.longitude,
+					name: this.profile.company,
+					address: this.profile.address,
 					success: function() {
 						console.log('success');
 					}
@@ -323,6 +388,7 @@
 			openShareDialog() {
 				// #ifdef H5
 				// 直接调用海报生成
+                this.isShowPainter=true
 				// #endif
 				// #ifdef MP-WEIXIN
 				this.$refs.popup.open();
@@ -332,18 +398,27 @@
 			 * 保存海报
 			 */
 			saveImage() {
-				console.log(this.image_path);
-				this.isShowPainter = false;
-				uni.saveImageToPhotosAlbum({
-					filePath: this.image_path,
-					success(res) {
-						uni.showToast({
-							title: '已保存到相册',
-							icon: 'success',
-							duration: 2000
-						})
-					}
-				})
+				console.log("测试乌拉拉", this.image_path);
+                // #ifndef H5
+                this.isShowPainter = false;
+                uni.saveImageToPhotosAlbum({
+                	filePath: this.image_path,
+                	success(res) {
+                		uni.showToast({
+                			title: '已保存到相册',
+                			icon: 'success',
+                			duration: 2000
+                		})
+                	}
+                })
+                // #endif
+                // #ifdef H5
+                uni.showToast({
+                    title: "H5暂不支持保存海报！",
+                    icon: 'none'
+                })
+                // #endif
+
 			},
 			/**
 			 * 遮罩层滑动阻止
@@ -369,7 +444,6 @@
 		font-size: 14px;
 		background-color: var(--primary-color);
 		--gray-color: #888;
-		--primary-color: #37538f;
 	}
 
 	.avatar {

@@ -85,5 +85,10 @@ INSERT INTO `yang_profile` (`user_id`, `type`, `key`, `name`, `value`) VALUES
 (1, '联系方式', 'company', '公司', '广东省安卓消防职业培训学院'),
 (1, '联系方式', 'website', '网址', 'http://www.anzhuoxfpx.com'),
 (1, '联系方式', 'address', '地址', '广州市天河区高科路37号国家大学科技园B栋1-2楼（总部）')
-(1, '主题样式', 'theme_color', '主题颜色', '#36538f');
+(1, '主题样式', 'theme_color', '主题颜色', '#36538f'),
+(1, '位置信息', 'latitude', '纬度', '23.187087'),
+(1, '位置信息', 'longitude', '经度', '113.410169');
 ```
+
+# 功能开发说明
+* 后台头像上传

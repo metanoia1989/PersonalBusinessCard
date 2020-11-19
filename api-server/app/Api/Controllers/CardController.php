@@ -32,12 +32,16 @@ class CardController
         $list = (new ProfileModel)->whereGet([['user_id', '=', $uid]]);
 
         $desc = $request->getAttribute('desc', 0); // 是否要对描述按换行符分割
+        $app_url = getenv('APP_URL');
 
         // 处理信息中特别的记录 
-        $list = array_map(function ($item) use ($desc) {
+        $list = array_map(function ($item) use ($desc, $app_url) {
             if ($desc && $item["key"] == "description") {
                 $value = explode("\n", $item["value"]);
                 $item["value"] = array_filter($value);
+            }
+            if ($desc && $item["key"] == "avatar") {
+                $item["value"] =  $app_url.$item["value"];
             }
             if ($item["key"] == "tags") {
                 $item["value"] = explode(",", $item["value"]);

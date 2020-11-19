@@ -1,14 +1,14 @@
 <template>
 	<canvas v-if="isUse2dCanvas" :id="canvasId" type="2d" :style="style"></canvas>
-	<canvas v-else :canvas-id="canvasId" :style="style" :id="canvasId" :width="boardWidth * dpr" :height="boardHeight  * dpr"></canvas>
+	<canvas v-else :canvas-id="canvasId" :style="style" :id="canvasId" :width="boardWidth * dpr" :height="boardHeight * dpr"></canvas>
 </template>
 
 <script>
-import { toPx, dataURItoBlob, base64ToPath} from './utils';
+import { toPx, dataURItoBlob, base64ToPath, compareVersion} from './utils';
 import { Draw } from './draw';
-import { adaptor } from './canvas'
+import { adaptor } from './canvas';
 export default {
-	// version: '1.5.7.0',
+	// version: '1.5.8.4',
 	name: 'l-painter',
 	props: {
 		board: Object,
@@ -16,57 +16,41 @@ export default {
 			type: String,
 			default: 'png'
 		},
-		maxDrawCount: {
-			type: Number,
-			default: 5
-		},
 		width: [Number, String],
 		height: [Number, String],
 		pixelRatio: Number,
 		customStyle: String,
 		isRenderImage: Boolean,
 		isBase64ToPath: Boolean,
+		isH5PathToBase64: Boolean,
 		type: {
 			type: String,
 			default: '2d',
 		},
 	},
 	data() {
-		// #ifndef MP-WEIXIN || MP-QQ 
-		const canvasId = `l-painter_${JSON.stringify(Math.random()).split('.')[1]}`
-		// #endif
-		// #ifdef MP-WEIXIN || MP-QQ 
-		const canvasId = `l-painter`
-		// #endif
 		return {
-			drawCount: 0,
-			canvasId,
-			use2dCanvas: this.type ==='2d' ? true : false ,
+			// #ifndef MP-WEIXIN || MP-QQ 
+			canvasId: `l-painter_${this._uid}`,
+			// #endif
+			// #ifdef MP-WEIXIN || MP-QQ 
+			canvasId: `l-painter`,
+			// #endif
+			use2dCanvas: this.type ==='2d' ? true : false,
 			draw: null,
 			ctx: null
 		};
-	},
-	watch: {
-		newboard: {
-			handler(val, old) {
-				if (JSON.stringify(val) === '{}') return;
-				const {width: w, height: h} = val || {};
-				const {width: ow, height: oh} = old || {};
-				if(w !== ow || h !== oh) {
-					this.inited = false;
-					this.drawCount = 0;
-				}
-				this.render();
-			},
-			immediate: true,
-			deep: true
-		},
 	},
 	computed: {
 		newboard() {
 			return this.board && JSON.parse(JSON.stringify(this.board))
 		},
 		isUse2dCanvas() {
+			const {canvasId } = this
+			// #ifdef MP-WEIXIN
+			const {SDKVersion} = wx.getSystemInfoSync()
+			this.use2dCanvas = compareVersion(SDKVersion, '2.9.2') >= 0;
+			// #endif
 			return this.type === '2d' && this.use2dCanvas
 		},
 		style() {
@@ -84,28 +68,52 @@ export default {
 			return toPx(this.height || height);
 		}
 	},
+	mounted() {
+		this.$watch('newboard', async (val, old) => {
+			if (JSON.stringify(val) === '{}' || !val) return;
+			const {width: w, height: h} = val || {};
+			const {width: ow, height: oh} = old || {};
+			if(w !== ow || h !== oh) {
+				this.inited = false;
+			}
+			this.render();
+		}, {
+			deep: true, 
+			immediate: true,
+			})
+	},
 	methods: {
 		render(args = {}) {
 			this.getContext().then(async (ctx) => {
-				const { use2dCanvas, boardWidth, boardHeight, board, canvas, isBase64ToPath } = this;
+				const { use2dCanvas, boardWidth, boardHeight, board, canvas, isBase64ToPath, isH5PathToBase64 } = this;
 				if(!this.ctx) {
 					this.ctx = ctx
 				}
 				const {width, height} = args
+				const isArgs = JSON.stringify(args) != '{}'
+				if(!width && isArgs){
+					args.width = boardWidth
+				}
+				if(!height && isArgs){
+					args.height = boardHeight
+				}
 				if (use2dCanvas && !canvas) {
 					return Promise.reject(new Error('render: fail canvas has not been created'));
 				}
+				
 				this.boundary = {
 				  top: 0,
 				  left: 0,
 				  width: boardWidth || width,
 				  height: boardHeight || height,
 				}
+				// this.ctx.setTransform(1, 0, 0, 1, 0, 0);
 				this.ctx.clearRect(0, 0, boardWidth, boardHeight);
 				if(!this.draw) {
-					this.draw = new Draw(this.ctx, canvas, use2dCanvas);
+					this.draw = new Draw(this.ctx, canvas, use2dCanvas, isH5PathToBase64);
 				} 
-				await this.draw.drawBoard(JSON.stringify(args) != '{}' ? args : board);
+				await this.draw.drawBoard(isArgs ? args : board);
+				await new Promise(resolve => this.$nextTick(resolve)) 
 				if (!use2dCanvas) {
 					await this.canvasDraw(this.ctx);
 				}
@@ -113,14 +121,11 @@ export default {
 				if(this.isRenderImage) {
 					this.canvasToTempFilePath()
 					.then(async res => {
-						const isPass = await this.contrast(res.tempFilePath)
-						if(isPass) {
-							if(/^data:image\/(\w+);base64/.test(res.tempFilePath) && isBase64ToPath) {
-								const img = await base64ToPath(res.tempFilePath)
-								this.$emit('success', img)
-							} else {
-								this.$emit('success', res.tempFilePath)
-							}
+						if(/^data:image\/(\w+);base64/.test(res.tempFilePath) && isBase64ToPath) {
+							const img = await base64ToPath(res.tempFilePath)
+							this.$emit('success', img)
+						} else {
+							this.$emit('success', res.tempFilePath)
 						}
 					})
 					.catch(err => {
@@ -139,41 +144,40 @@ export default {
 				});
 			});
 		},
-		getContext() {
-			if(this.ctx && this.inited) return Promise.resolve(this.ctx);
+		async getContext() {
+			if(this.ctx && this.inited) {
+				return Promise.resolve(this.ctx)
+			};
 			const { type, isUse2dCanvas, dpr, boardWidth, boardHeight } = this;
-			
-			// #ifdef MP-BAIDU
-			return new Promise((resolve) => {
-					uni.createSelectorQuery()
-						.in(this)
-						.select('#' + this.canvasId)
-						.boundingClientRect().exec((res) =>{
-							if(res) {
-								const ctx = uni.createCanvasContext(this.canvasId, this);
+			const _getContext = () => {
+				return new Promise(resolve => {
+				uni.createSelectorQuery()
+					.in(this)
+					.select('#' + this.canvasId)
+					.boundingClientRect()
+					.exec(res => {
+						if(res) {
+							const ctx = uni.createCanvasContext(this.canvasId, this);
+							if (!this.inited) {
+								this.inited = true;
 								this.use2dCanvas = false;
-								this.inited = true
-								resolve(ctx);
+								this.canvas = res
 							}
-						})
-			})
-			// #endif
-			
+							// #ifdef MP-ALIPAY
+							ctx.scale(dpr, dpr);
+							// #endif
+							resolve(ctx);
+						}
+					})
+				})
+			}
 			// #ifndef MP-WEIXIN 
-			const ctx = uni.createCanvasContext(this.canvasId, this);
-			this.use2dCanvas = false;
-			this.inited = true
-			// #ifdef MP-ALIPAY
-			ctx.scale(dpr, dpr);
-			// #endif
-			return Promise.resolve(ctx);
+			return _getContext()
 			// #endif
 			
 			if(!isUse2dCanvas) {
-				const ctx = uni.createCanvasContext(this.canvasId, this);
-				return Promise.resolve(ctx);
+				return _getContext()
 			}
-			
 			return new Promise(resolve => {
 				uni.createSelectorQuery()
 					.in(this)
@@ -203,13 +207,11 @@ export default {
 		  const {use2dCanvas, canvasId} = this
 		  return new Promise((resolve, reject) => {
 		    let { top = 0, left = 0, width, height } = this.boundary
-			let destWidth =  width * this.dpr
-			let destHeight =  height * this.dpr
+			let destWidth = width * this.dpr
+			let destHeight = height * this.dpr
 			// #ifdef MP-ALIPAY
 			width = width * this.dpr
 			height = height * this.dpr
-			destWidth = width
-			destHeight = height
 			// #endif
 		    const copyArgs = {
 		      x: left,
@@ -230,34 +232,6 @@ export default {
 		    }
 		    uni.canvasToTempFilePath(copyArgs, this)
 		  })
-		},
-		contrast(filePath) {
-			return new Promise((resolve, reject) => {
-				uni.getImageInfo({
-					src: filePath,
-					success: (res) => {
-						if(this.drawCount >  this.maxDrawCount) {
-							const error = `绘制了${this.maxDrawCount}次, 但结果还是不成功！`;
-							console.error(error);
-							this.$emit('fail', error)
-							resolve(false)
-							return
-						}
-						// 比较画板和生成图的宽度比例相符时才证明绘制成功，否则进行强制重绘制
-						if(Math.abs((res.width * this.boardHeight -  this.boardWidth * res.height) / (res.height * this.boardHeight)) < 0.01) {
-							resolve(true)
-						} else {
-							this.render()
-						}
-						this.drawCount++
-					},
-					fail: (err) => {
-						console.error(`getImageInfo:fail ${filePath} failed ${JSON.stringify(err)}`)
-						this.$emit('fail', `${JSON.stringify(err)}`)
-						resolve(true)
-					}
-				})
-			})
 		}
 	}
 };
