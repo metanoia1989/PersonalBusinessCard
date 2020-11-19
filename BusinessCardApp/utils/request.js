@@ -68,7 +68,7 @@ class request {
             } else {
               uni.showModal({
                 title: '提示',
-                content: '登陆超时，请关闭程序重新登陆',
+                content: data.message,
                 showCancel: false,
               })
             }

@@ -27,8 +27,6 @@
     "mix/monolog": "~2.2.0",
     "mix/validate": "~2.2.0",
     "mix/database": "~2.2.0",
-    "mix/redis": "~2.2.0",
-    "mix/redis-subscribe": "~2.2.0",
     "mix/cache": "~2.2.0",
     "mix/guzzle": "~2.2.0",
     "mix/auth": "~2.2.0",

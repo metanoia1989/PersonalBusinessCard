@@ -54,6 +54,9 @@
     },
     "h5" : {
         "title" : "杨茂珍",
-        "domain" : "https://yang.anzhuoxfpx.com "
+        "domain" : "https://yang.anzhuoxfpx.com ",
+        "router" : {
+            "base" : "/h5/"
+        }
     }
 }
